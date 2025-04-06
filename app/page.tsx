@@ -1,3 +1,5 @@
+'use client';
+
 import { MainNav } from "@/components/main-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -5,8 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AnalyticsChart } from "@/components/analytics-chart"
 import { RecentPrescriptions } from "@/components/recent-prescriptions"
 import { Pill, Stethoscope, Package, Activity, DollarSign, AlertTriangle } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export default function Home() {
+  const router = useRouter();
+
   return (
     <div className="flex min-h-screen flex-col">
       <MainNav />
@@ -23,7 +28,7 @@ export default function Home() {
               </div>
               <div className="flex items-center space-x-2">
                 <Button variant="outline">Export Report</Button>
-                <Button>New Prescription</Button>
+                <Button onClick={() => router.push('/prescriptions/new')}>New Prescription</Button>
               </div>
             </div>
 

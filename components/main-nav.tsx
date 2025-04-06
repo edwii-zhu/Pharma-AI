@@ -10,11 +10,24 @@ import {
   FileText, 
   Users, 
   Settings, 
-  Bell 
+  Bell,
+  ChevronDown,
+  Clipboard,
+  BarChart3,
+  Truck
 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export function MainNav() {
   const pathname = usePathname()
+  
+  // Check if the current path is part of the inventory section
+  const isInventoryPath = pathname.startsWith('/inventory')
 
   return (
     <div className="flex h-16 items-center px-4 border-b">
@@ -34,16 +47,61 @@ export function MainNav() {
             <LayoutDashboard className="h-4 w-4" />
             <span>Dashboard</span>
           </Link>
-          <Link
-            href="/inventory"
-            className={cn(
-              "flex items-center space-x-2 text-muted-foreground hover:text-primary transition-colors",
-              pathname === "/inventory" && "text-primary"
-            )}
-          >
-            <Package className="h-4 w-4" />
-            <span>Inventory</span>
-          </Link>
+          
+          {/* Inventory Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div
+                className={cn(
+                  "flex items-center space-x-2 text-muted-foreground hover:text-primary transition-colors cursor-pointer",
+                  isInventoryPath && "text-primary"
+                )}
+              >
+                <Package className="h-4 w-4" />
+                <span>Inventory</span>
+                <ChevronDown className="h-3 w-3" />
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem asChild>
+                <Link 
+                  href="/inventory"
+                  className={cn(
+                    "flex items-center space-x-2 w-full",
+                    pathname === "/inventory" && "bg-muted"
+                  )}
+                >
+                  <Clipboard className="h-4 w-4 mr-2" />
+                  Inventory List
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link 
+                  href="/inventory/batch"
+                  className={cn(
+                    "flex items-center space-x-2 w-full",
+                    pathname === "/inventory/batch" && "bg-muted"
+                  )}
+                >
+                  <Truck className="h-4 w-4 mr-2" />
+                  Batch Operations
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link 
+                  href="/inventory/analytics"
+                  className={cn(
+                    "flex items-center space-x-2 w-full",
+                    pathname === "/inventory/analytics" && "bg-muted"
+                  )}
+                >
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Analytics
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
           <Link
             href="/prescriptions"
             className={cn(
