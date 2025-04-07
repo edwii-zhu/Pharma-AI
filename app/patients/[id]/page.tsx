@@ -1,4 +1,4 @@
-import { getAllPatientIds } from "@/lib/supabase";
+import { getAllPatientIds, getPatientById } from "@/lib/supabase";
 import PatientDetailClient from "./patient-detail-client";
 
 // Required for static export with dynamic routes
@@ -10,13 +10,22 @@ export async function generateStaticParams() {
   }));
 }
 
-type PatientPageProps = {
+type Props = {
   params: { id: string };
-}
+};
 
-export default function PatientDetailPage({ params }: PatientPageProps) {
-  // This is now a Server Component
-  // It fetches data needed for generateStaticParams
-  // and renders the client component, passing the ID
-  return <PatientDetailClient patientId={params.id} />;
+export default async function PatientDetailPage({ params }: Props) {
+  // Extract and validate the ID from params
+  const { id } = params;
+  
+  try {
+    // In Next.js 14, we need to await the data fetch in the server component
+    await getPatientById(id);
+    
+    // Then pass the ID to the client component
+    return <PatientDetailClient patientId={id} />;
+  } catch (error) {
+    console.error("Error verifying patient data:", error);
+    return <PatientDetailClient patientId={id} />;
+  }
 } 
