@@ -4,7 +4,7 @@ import PrescriptionProcessor from "@/components/PrescriptionProcessor";
 
 export const metadata: Metadata = {
   title: "New Prescription | Pharma-AI",
-  description: "Create a new prescription using OCR technology",
+  description: "Create a new prescription using AI-powered scanning technology",
 };
 
 const Page = () => {

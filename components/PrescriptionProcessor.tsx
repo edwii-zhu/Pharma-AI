@@ -38,6 +38,7 @@ interface ExtractedPrescription {
     type: 'interaction' | 'unclear' | 'error';
     message: string;
     severity: 'low' | 'medium' | 'high';
+    detail?: string;
   }>;
 }
 
@@ -52,6 +53,97 @@ interface ProcessingError {
   details?: string;
 }
 
+// Add this new component for warning display
+const WarningCard = ({ 
+  warnings, 
+  isAcknowledged, 
+  onAcknowledge 
+}: { 
+  warnings: ExtractedPrescription['warnings'], 
+  isAcknowledged: boolean, 
+  onAcknowledge: () => void 
+}) => {
+  return (
+    <div className="mb-6" id="warnings-section">
+      <div className={`overflow-hidden rounded-lg border-2 ${isAcknowledged ? 'border-orange-400' : 'border-red-600'} shadow-lg`}>
+        {/* Warning header */}
+        <div className={`w-full px-4 py-3 ${isAcknowledged ? 'bg-orange-500' : 'bg-red-600'} text-white`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <AlertTriangle className="h-6 w-6 mr-3" />
+              <h3 className="text-lg font-bold">
+                {isAcknowledged ? 'Warnings Acknowledged' : 'Medication Warnings'}
+              </h3>
+            </div>
+            {!isAcknowledged && (
+              <span className="inline-block animate-pulse bg-white text-red-600 text-xs font-bold px-2 py-1 rounded">
+                ACTION REQUIRED
+              </span>
+            )}
+          </div>
+        </div>
+          
+        {/* Warning content */}
+        <div className={`p-4 ${isAcknowledged ? 'bg-orange-50' : 'bg-red-50'}`}>
+          <ul className="space-y-3">
+            {warnings.map((warning, index) => (
+              <li key={index} className="rounded-md border-l-4 border-l-red-600 bg-white p-3 shadow-sm">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-900 text-base">
+                      {warning.type === 'interaction' ? 'Drug Interaction' : 
+                       warning.type === 'unclear' ? 'Unclear Information' : 'Error'}
+                    </span>
+                    {warning.severity === 'high' && (
+                      <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-md font-bold">
+                        High Risk
+                      </span>
+                    )}
+                    {warning.severity === 'medium' && (
+                      <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-md font-bold">
+                        Medium Risk
+                      </span>
+                    )}
+                    {warning.severity === 'low' && (
+                      <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-md font-bold">
+                        Low Risk
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-gray-900 font-medium text-base">{warning.message}</p>
+                  {warning.detail && (
+                    <p className="text-gray-700 text-sm mt-1">
+                      <span className="font-bold">Recommendation:</span> {warning.detail}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+          
+          <div className="mt-4 flex items-center justify-between">
+            <p className={`${isAcknowledged ? 'text-orange-700' : 'text-red-700'} font-semibold`}>
+              {isAcknowledged 
+                ? 'You have acknowledged these warnings - proceed with caution' 
+                : 'These warnings require acknowledgment before proceeding'}
+            </p>
+            <Button 
+              variant={isAcknowledged ? "outline" : "destructive"}
+              size="sm" 
+              className={isAcknowledged 
+                ? "border-orange-500 text-orange-700 hover:bg-orange-50" 
+                : "bg-red-600 hover:bg-red-700 text-white font-bold px-4"}
+              onClick={onAcknowledge}
+            >
+              {isAcknowledged ? "Warnings Acknowledged ✓" : "Acknowledge Warnings"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PrescriptionProcessor = () => {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,6 +155,7 @@ const PrescriptionProcessor = () => {
   const [processingError, setProcessingError] = useState<ProcessingError | null>(null);
   const [extractedData, setExtractedData] = useState<ExtractedPrescription | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'rejected'>('pending');
+  const [warningsAcknowledged, setWarningsAcknowledged] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedMedicationId, setSelectedMedicationId] = useState<string | null>(null);
@@ -93,6 +186,7 @@ const PrescriptionProcessor = () => {
     setProcessingError(null);
     setProcessingTime(0);
     setIsEditing(false);
+    setWarningsAcknowledged(false);
     setEditablePatient({ name: '', dateOfBirth: '', id: '' });
     setEditableMedication({ name: '', dosage: '', frequency: '', instructions: '' });
     setEditablePrescriber({ name: '', npi: '', date: '' });
@@ -201,7 +295,7 @@ const PrescriptionProcessor = () => {
         if (isProcessing) {
           setProcessingError({
             error: "Processing timed out",
-            details: "The OCR process took too long. Try with a clearer image, reduce file size, or use a PDF."
+            details: "The AI analysis process took too long. Try with a clearer image, reduce file size, or use a PDF."
           });
           setIsProcessing(false);
         }
@@ -247,12 +341,6 @@ const PrescriptionProcessor = () => {
       
       let errorMsg = error.message || 'Error processing prescription';
       let errorDetails = error.cause || 'Please try again with a clearer image or a different file format.';
-      
-      // Handle specific abort error
-      if (error.name === 'AbortError') {
-        errorMsg = 'OCR process timeout';
-        errorDetails = 'The request was terminated due to taking too long. Try with a clearer, smaller file.';
-      }
       
       setProcessingError({
         error: errorMsg,
@@ -329,165 +417,160 @@ const PrescriptionProcessor = () => {
     setFilePreview(null);
   };
 
+  // Add handler function for acknowledging warnings
+  const handleAcknowledgeWarnings = () => {
+    setWarningsAcknowledged(true);
+  };
+
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-bold">Process New Prescription</h1>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Upload Prescription</CardTitle>
-          <CardDescription>
-            Upload a high-quality image or PDF of the prescription to extract information
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent className="space-y-6">
-          {/* File Upload Area */}
-          <div 
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragging ? 'border-primary bg-primary/10' : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'}`}
-          >
-            <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
-              <Upload className="w-10 h-10 mb-3 text-gray-400" />
-              <p className="mb-2 text-sm text-gray-500">
-                <span className="font-semibold">Click to upload</span> or drag and drop
-              </p>
-              <p className="text-xs text-gray-500">Images or PDF (MAX. 15MB)</p>
+      {!extractedData && (
+        <Card className={`border-2 ${isDragging ? 'border-primary border-dashed bg-primary/5' : 'border-border'}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}>
+          <CardHeader>
+            <CardTitle>Upload Prescription</CardTitle>
+            <CardDescription>
+              Upload or drag a prescription to scan using Gemini 1.5 AI analysis
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* File selection area */}
+            <div className="flex flex-col items-center justify-center p-6 rounded-lg border-2 border-dashed border-muted-foreground/25 text-center">
+              <Upload className="h-8 w-8 mb-2 text-muted-foreground" />
+              <div className="mb-2 font-medium">
+                Drop prescription image or PDF here
+              </div>
+              <div className="text-xs text-muted-foreground mb-4">
+                Supported formats: JPG, PNG, PDF (max 15MB)
+              </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/*,.pdf"
+                className="hidden"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}>
+                Browse files
+              </Button>
             </div>
-            <input 
-              ref={fileInputRef} 
-              type="file" 
-              onChange={handleFileSelect}
-              className="hidden" 
-              accept="image/*,application/pdf"
-            />
-          </div>
-          
-          <Alert>
-            <AlertTitle>For best OCR results:</AlertTitle>
-            <AlertDescription>
-              <ul className="list-disc pl-5 mt-2 text-sm">
-                <li>Use high-contrast, well-lit images</li>
-                <li>Ensure text is clearly legible and not blurry</li>
-                <li>PDFs generally work better than images</li>
-                <li>Avoid shadows and glare on the prescription</li>
-                <li>Keep file size below 5MB for faster processing</li>
-              </ul>
-            </AlertDescription>
-          </Alert>
-          
-          {/* File List */}
-          {files.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium">Selected File:</h4>
-              <ul className="space-y-2">
-                {files.map((file, index) => (
-                  <li key={index} className="flex items-center justify-between p-2 border rounded-md bg-white">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      {getFileIcon(file)}
-                      <span className="text-sm font-medium text-gray-800 truncate flex-1" title={file.name}>{file.name}</span>
-                      <span className="text-xs text-gray-500 flex-shrink-0">{formatFileSize(file.size)}</span>
-                    </div>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 text-gray-500 hover:text-red-600 flex-shrink-0"
-                      onClick={() => removeFile(index)}
-                    >
-                      <X className="h-4 w-4" />
-                      <span className="sr-only">Remove file</span>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-              <Button 
-                type="button"
+            
+            {/* Selected file preview */}
+            {files.length > 0 && (
+              <div className="space-y-2">
+                <Label>Selected File:</Label>
+                <div className="flex items-center justify-between p-2 rounded-md border bg-background">
+                  <div className="flex items-center space-x-2">
+                    {getFileIcon(files[0])}
+                    <span className="text-sm font-medium truncate">{files[0].name}</span>
+                    <span className="text-xs text-muted-foreground">{formatFileSize(files[0].size)}</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => removeFile(0)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {/* File preview image */}
+            {filePreview && files[0]?.type.startsWith('image/') && (
+              <div className="space-y-2">
+                <Label>Preview:</Label>
+                <div className="relative border rounded-md overflow-hidden">
+                  <img 
+                    src={filePreview} 
+                    alt="Prescription preview" 
+                    className="w-full object-contain max-h-[300px]"
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Action buttons */}
+            <div className="flex justify-end">
+              <Button
                 onClick={handleProcessFiles}
-                disabled={isProcessing || files.length === 0}
-                className="w-full sm:w-auto"
+                disabled={files.length === 0 || isProcessing}
               >
                 {isProcessing ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing...
+                  </>
                 ) : (
-                  <>Process File & Extract Data</>
+                  <>
+                    <Image className="mr-2 h-4 w-4" />
+                    Analyze Prescription
+                  </>
                 )}
+              </Button>
+            </div>
+            
+            {/* Processing indicators */}
+            {isProcessing && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Gemini 1.5 analyzing prescription...</span>
+                  <span className="text-sm text-muted-foreground">{processingTime}s</span>
+                </div>
+                <Progress value={Math.min(processingTime / 90 * 100, 100)} className="h-2" />
+                <p className="text-xs text-muted-foreground">
+                  Processing large or complex prescriptions may take up to 90 seconds
+                </p>
+              </div>
+            )}
+            
+            {/* Error display */}
+            {processingError && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>{processingError.error}</AlertTitle>
+                <AlertDescription>
+                  {processingError.details}
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
+      
+      {/* Extracted Information - Editable Form */}
+      {extractedData && (
+        <Card className="relative">
+          {/* Sticky warning banner */}
+          {extractedData.warnings && 
+           extractedData.warnings.length > 0 && 
+           !warningsAcknowledged && (
+            <div className="sticky top-0 z-50 w-full bg-red-600 text-white py-2 px-4 flex items-center justify-between rounded-t-lg">
+              <div className="flex items-center">
+                <AlertTriangle className="h-5 w-5 mr-2" />
+                <span className="font-bold">Warning: {extractedData.warnings.length} safety issue{extractedData.warnings.length > 1 ? 's' : ''} detected</span>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="border-white text-white hover:bg-red-700"
+                onClick={() => {
+                  // Scroll to warnings section
+                  document.getElementById('warnings-section')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                View Warnings
               </Button>
             </div>
           )}
           
-          {/* File Preview */}
-          {filePreview && (
-            <div className="border rounded-md overflow-hidden mt-4 h-[450px] max-h-[450px]">
-              {files[0]?.type.includes('pdf') ? (
-                <iframe 
-                  src={filePreview} 
-                  className="w-full h-full" 
-                  title="PDF Preview"
-                />
-              ) : (
-                <img 
-                  src={filePreview} 
-                  alt="Prescription Preview" 
-                  className="w-full h-full object-contain"
-                />
-              )}
-            </div>
-          )}
-          
-          {/* Processing Status */}
-          {isProcessing && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-blue-600">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Processing prescription... {processingTime}s</span>
-              </div>
-              <Progress value={Math.min(processingTime, 90)} max={90} className="h-2" />
-              <p className="text-xs text-muted-foreground">OCR processing can take up to 90 seconds for complex images</p>
-              
-              {processingTime >= 30 && (
-                <Alert variant="default" className="mt-2 border-yellow-500">
-                  <Clock className="h-4 w-4 text-yellow-500" />
-                  <AlertTitle>Processing Time</AlertTitle>
-                  <AlertDescription>
-                    This is taking longer than usual. Processing complex images may take up to 90 seconds.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-          )}
-          
-          {/* Processing Error */}
-          {processingError && !isProcessing && (
-            <Alert variant="destructive" className="mt-2">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>{String(processingError.error)}</AlertTitle>
-              <AlertDescription>
-                {processingError.details && (
-                  <p className="mt-1">{processingError.details}</p>
-                )}
-                <div className="mt-2">
-                  <p className="text-sm font-medium">Suggestions to improve OCR:</p>
-                  <ul className="text-sm list-disc ml-5 mt-1">
-                    <li>Try with a clearer, higher resolution image</li>
-                    <li>Ensure the prescription is well-lit with good contrast</li>
-                    <li>Use a PDF instead of an image if available</li>
-                    <li>Make sure text is not blurry and is clearly legible</li>
-                    <li>Reduce file size to under 5MB if possible</li>
-                  </ul>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
-      
-      {/* Extracted Information - Editable Form */}
-      {extractedData && (
-        <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Prescription Information</CardTitle>
@@ -508,6 +591,15 @@ const PrescriptionProcessor = () => {
           </CardHeader>
           
           <CardContent className="space-y-6">
+            {/* Warnings - Make the section ID for scrolling */}
+            {extractedData.warnings && extractedData.warnings.length > 0 && (
+              <WarningCard 
+                warnings={extractedData.warnings} 
+                isAcknowledged={warningsAcknowledged} 
+                onAcknowledge={handleAcknowledgeWarnings}
+              />
+            )}
+            
             {/* Patient Information */}
             <div>
               <h3 className="text-lg font-semibold mb-3">Patient Information</h3>
@@ -694,33 +786,22 @@ const PrescriptionProcessor = () => {
             </div>
             
             {/* Additional prescription fields could be added here */}
-            
-            {extractedData.warnings && extractedData.warnings.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold mb-3">Warnings</h3>
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Important Warnings</AlertTitle>
-                  <AlertDescription>
-                    <ul className="list-disc pl-5 mt-2">
-                      {extractedData.warnings.map((warning, index) => (
-                        <li key={index} className="mt-1">
-                          <span className="font-medium">{warning.type === 'interaction' ? 'Drug Interaction' : warning.type === 'unclear' ? 'Unclear Information' : 'Error'}:</span> {warning.message}
-                        </li>
-                      ))}
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-              </div>
-            )}
           </CardContent>
           
           <CardFooter className="flex justify-end gap-2">
             <Button variant="outline" onClick={handleNewPrescription}>
               Cancel
             </Button>
-            <Button onClick={handleSavePrescription}>
-              Save Prescription
+            <Button 
+              onClick={handleSavePrescription}
+              disabled={extractedData.warnings && extractedData.warnings.length > 0 && !warningsAcknowledged}
+              className={extractedData.warnings && extractedData.warnings.length > 0 && !warningsAcknowledged 
+                ? "opacity-50 cursor-not-allowed" 
+                : ""}
+            >
+              {extractedData.warnings && extractedData.warnings.length > 0 && !warningsAcknowledged 
+                ? "Acknowledge Warnings to Save" 
+                : "Save Prescription"}
             </Button>
           </CardFooter>
         </Card>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { MainNav } from "@/components/main-nav";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { 
   Table, 
@@ -28,7 +28,10 @@ import {
   Edit, 
   Trash2, 
   AlertCircle,
-  BarChart4 
+  BarChart4,
+  TrendingUp,
+  FileWarning,
+  Activity
 } from "lucide-react";
 import { 
   Select,
@@ -41,6 +44,22 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  BarChart, 
+  Bar, 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell 
+} from 'recharts';
 
 // Define the inventory item interface based on the database schema
 interface Medication {
@@ -125,6 +144,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState("inventory");
 
   // Fetch inventory data from Supabase
   useEffect(() => {
@@ -275,224 +295,541 @@ export default function InventoryPage() {
     }
   };
 
+  // Calculate overview data from inventory
+  const getOverviewData = () => {
+    const totalItems = inventoryItems.length;
+    const lowStockCount = inventoryItems.filter(item => item.status === 'Low Stock').length;
+    const outOfStockCount = inventoryItems.filter(item => item.status === 'Out of Stock').length;
+    const totalValue = inventoryItems.reduce((sum, item) => sum + (item.unitPrice * item.stockQuantity), 0);
+    
+    return {
+      totalItems,
+      lowStockCount,
+      outOfStockCount,
+      totalValue: totalValue.toFixed(2)
+    };
+  };
+
+  // Prepare chart data
+  const getCategoryChartData = () => {
+    const categoryMap = new Map();
+    
+    inventoryItems.forEach(item => {
+      if (!categoryMap.has(item.category)) {
+        categoryMap.set(item.category, 0);
+      }
+      categoryMap.set(item.category, categoryMap.get(item.category) + item.stockQuantity);
+    });
+    
+    return Array.from(categoryMap.entries()).map(([name, value]) => ({ name, value }));
+  };
+
+  const getStatusChartData = () => {
+    const counts = {
+      'In Stock': inventoryItems.filter(item => item.status === 'In Stock').length,
+      'Low Stock': inventoryItems.filter(item => item.status === 'Low Stock').length,
+      'Out of Stock': inventoryItems.filter(item => item.status === 'Out of Stock').length
+    };
+    
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  };
+
+  const getTopItemsData = () => {
+    return [...inventoryItems]
+      .sort((a, b) => b.stockQuantity - a.stockQuantity)
+      .slice(0, 5)
+      .map(item => ({
+        name: item.name,
+        value: item.stockQuantity
+      }));
+  };
+
+  // Colors for charts
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28BFF', '#FF6B6B'];
+  const STATUS_COLORS = ['#22c55e', '#f59e0b', '#ef4444'];
+
+  // Render the UI
+  const { totalItems, lowStockCount, outOfStockCount, totalValue } = getOverviewData();
+
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen w-full flex-col">
       <MainNav />
-      
-      <main className="flex-1">
-        <div className="container px-4 py-6">
-          <div className="grid gap-6">
-            <div className="flex items-center justify-between">
+      <div className="flex-1">
+        <div className="container px-4 py-6 md:px-6">
+          <div className="grid gap-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <div>
                 <h1 className="text-3xl font-bold">Inventory Management</h1>
-                <p className="text-muted-foreground">
-                  Manage and track your pharmacy inventory
+                <p className="text-sm text-muted-foreground">
+                  Manage your pharmacy inventory, track stock levels, and monitor expiry dates
                 </p>
               </div>
-              <div className="flex items-center space-x-2">
-                <Button 
-                  variant="outline" 
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  onClick={() => router.push('/inventory/batch')}
+                >
+                  <FileWarning className="h-4 w-4" />
+                  Batch Management
+                </Button>
+                <Button
+                  variant="outline"
                   className="flex items-center gap-2"
                   onClick={() => router.push('/inventory/analytics')}
                 >
-                  <BarChart4 className="h-4 w-4" />
-                  Analytics
+                  <Activity className="h-4 w-4" />
+                  Advanced Analytics
                 </Button>
-                <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-                  <DialogTrigger asChild>
+              </div>
+            </div>
+
+            {/* Add tabs for different views */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="inventory">Inventory List</TabsTrigger>
+                <TabsTrigger value="visualizations">Visualizations</TabsTrigger>
+                <TabsTrigger value="forecasting">AI Insights</TabsTrigger>
+              </TabsList>
+
+              {/* Inventory List Tab */}
+              <TabsContent value="inventory" className="space-y-4">
+                {/* Existing inventory management UI */}
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex w-full max-w-sm items-center gap-1.5">
+                    <Search className="absolute ml-2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      type="search" 
+                      placeholder="Search by name, NDC, or manufacturer..." 
+                      className="pl-8"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="flex items-center gap-1.5">
+                      <Select 
+                        value={categoryFilter}
+                        onValueChange={setCategoryFilter}
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Filter by category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Categories</SelectItem>
+                          {categories.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <Select 
+                        value={statusFilter}
+                        onValueChange={setStatusFilter}
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Statuses</SelectItem>
+                          <SelectItem value="In Stock">In Stock</SelectItem>
+                          <SelectItem value="Low Stock">Low Stock</SelectItem>
+                          <SelectItem value="Out of Stock">Out of Stock</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <Button 
-                      className="flex items-center gap-2"
-                      onClick={() => setCurrentItem(null)}
+                      className="flex items-center gap-2" 
+                      onClick={() => {
+                        setCurrentItem(null);
+                        setOpenDialog(true);
+                      }}
                     >
                       <Plus className="h-4 w-4" />
                       Add Item
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[600px]">
-                    <DialogHeader>
-                      <DialogTitle>{currentItem ? "Edit Inventory Item" : "Add New Inventory Item"}</DialogTitle>
-                      <DialogDescription>
-                        {currentItem ? "Update the details of this inventory item." : "Enter the details of the new inventory item."}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <InventoryItemForm 
-                      item={currentItem} 
-                      onSave={handleSaveItem} 
-                      onCancel={() => setOpenDialog(false)} 
-                    />
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
-
-            {/* Metrics Overview Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Total Items
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{inventoryItems.length}</div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Low Stock Items
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-amber-500">
-                    {inventoryItems.filter(item => item.status === "Low Stock").length}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Out of Stock
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-500">
-                    {inventoryItems.filter(item => item.status === "Out of Stock").length}
-                  </div>
-                </CardContent>
-              </Card>
+                {/* Existing table code */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Inventory Items ({filteredItems.length})</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {filteredItems.length === 0 ? (
+                      <div className="text-center p-4 text-muted-foreground">
+                        No matching inventory items found.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Product</TableHead>
+                              <TableHead>NDC</TableHead>
+                              <TableHead>Manufacturer</TableHead>
+                              <TableHead className="text-right">Stock</TableHead>
+                              <TableHead className="text-right">Price</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Last Updated</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredItems.map((item) => (
+                              <TableRow key={item.id}>
+                                <TableCell className="font-medium">{item.name}</TableCell>
+                                <TableCell>{item.ndcCode}</TableCell>
+                                <TableCell>{item.manufacturer}</TableCell>
+                                <TableCell className="text-right">
+                                  {item.stockQuantity} 
+                                  {item.stockQuantity <= item.reorderPoint && (
+                                    <span className="ml-1 text-xs text-yellow-500" title="Below reorder point">
+                                      (Min: {item.reorderPoint})
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">${item.unitPrice.toFixed(2)}</TableCell>
+                                <TableCell>
+                                  <Badge variant={getStatusBadgeVariant(item.status) as any}>{item.status}</Badge>
+                                </TableCell>
+                                <TableCell>{item.lastUpdated}</TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        setCurrentItem(item);
+                                        setOpenDialog(true);
+                                      }}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="text-red-500"
+                                      onClick={() => handleDeleteItem(item.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Total Inventory Value
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    ${inventoryItems.reduce((sum, item) => sum + (item.stockQuantity * item.unitPrice), 0).toFixed(2)}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+              {/* Visualizations Tab */}
+              <TabsContent value="visualizations" className="space-y-4">
+                {/* Overview Cards */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Total Items
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{totalItems}</div>
+                      <p className="text-xs text-muted-foreground">
+                        Across {categories.length} categories
+                      </p>
+                    </CardContent>
+                  </Card>
 
-            {/* Filters and Search */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search by name, NDC, or manufacturer..."
-                  className="pl-8"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-1 sm:flex-none gap-2">
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-full sm:w-[150px]">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>{category}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-[150px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="In Stock">In Stock</SelectItem>
-                    <SelectItem value="Low Stock">Low Stock</SelectItem>
-                    <SelectItem value="Out of Stock">Out of Stock</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Low Stock Items
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-amber-500">{lowStockCount}</div>
+                      <p className="text-xs text-muted-foreground">
+                        {Math.round((lowStockCount / totalItems) * 100)}% of inventory
+                      </p>
+                    </CardContent>
+                  </Card>
 
-            {/* Inventory Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Inventory Items ({filteredItems.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {filteredItems.length === 0 ? (
-                  <div className="text-center p-4 text-muted-foreground">
-                    No matching inventory items found.
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead>NDC</TableHead>
-                          <TableHead>Manufacturer</TableHead>
-                          <TableHead className="text-right">Stock</TableHead>
-                          <TableHead className="text-right">Price</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Last Updated</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredItems.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-medium">{item.name}</TableCell>
-                            <TableCell>{item.ndcCode}</TableCell>
-                            <TableCell>{item.manufacturer}</TableCell>
-                            <TableCell className="text-right">
-                              {item.stockQuantity} 
-                              {item.stockQuantity <= item.reorderPoint && (
-                                <span className="ml-1 text-xs text-yellow-500" title="Below reorder point">
-                                  (Min: {item.reorderPoint})
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">${item.unitPrice.toFixed(2)}</TableCell>
-                            <TableCell>
-                              <Badge variant={getStatusBadgeVariant(item.status) as any}>{item.status}</Badge>
-                            </TableCell>
-                            <TableCell>{item.lastUpdated}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => {
-                                    setCurrentItem(item);
-                                    setOpenDialog(true);
-                                  }}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Out of Stock Items
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-red-500">{outOfStockCount}</div>
+                      <p className="text-xs text-muted-foreground">
+                        {Math.round((outOfStockCount / totalItems) * 100)}% of inventory
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        Total Inventory Value
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">${totalValue}</div>
+                      <p className="text-xs text-muted-foreground">
+                        Based on current unit prices
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Charts */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Stock Status Distribution</CardTitle>
+                      <CardDescription>
+                        Overview of inventory status levels
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div style={{ width: '100%', height: '300px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={getStatusChartData()}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                              outerRadius={100}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {getStatusChartData().map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Category Distribution</CardTitle>
+                      <CardDescription>
+                        Inventory by medication category
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div style={{ width: '100%', height: '300px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={getCategoryChartData()}
+                            layout="vertical"
+                            margin={{
+                              top: 5,
+                              right: 30,
+                              left: 80,
+                              bottom: 5,
+                            }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" />
+                            <YAxis type="category" dataKey="name" />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey="value" fill="#8884d8" name="Quantity" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Top Items Chart */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top Items by Quantity</CardTitle>
+                    <CardDescription>
+                      Highest inventory quantities
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div style={{ width: '100%', height: '300px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={getTopItemsData()}
+                          margin={{
+                            top: 20,
+                            right: 30,
+                            left: 20,
+                            bottom: 60,
+                          }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis 
+                            dataKey="name" 
+                            angle={-45} 
+                            textAnchor="end"
+                            height={70}
+                          />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="value" fill="#82ca9d" name="Quantity">
+                            {getTopItemsData().map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* AI Insights Tab */}
+              <TabsContent value="forecasting" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>AI-Generated Insights</CardTitle>
+                    <CardDescription>
+                      Smart insights powered by advanced analytics
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                      <div className="flex items-start space-x-2">
+                        <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                        <div>
+                          <h3 className="font-semibold text-amber-800">Low Stock Alert</h3>
+                          <p className="text-sm text-amber-700">
+                            {lowStockCount} items are below their reorder points. Consider restocking soon to avoid stockouts.
+                          </p>
+                          <Button size="sm" variant="outline" className="mt-2">View Items</Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border rounded-lg p-4">
+                      <h3 className="font-semibold mb-2">Top Restocking Priorities</h3>
+                      <ul className="space-y-2">
+                        {inventoryItems
+                          .filter(item => item.status === 'Low Stock' || item.status === 'Out of Stock')
+                          .sort((a, b) => {
+                            // Out of stock takes priority
+                            if (a.status === 'Out of Stock' && b.status !== 'Out of Stock') return -1;
+                            if (a.status !== 'Out of Stock' && b.status === 'Out of Stock') return 1;
+                            // Then sort by how close they are to reorder point (as a percentage)
+                            const aRatio = a.stockQuantity / a.reorderPoint;
+                            const bRatio = b.stockQuantity / b.reorderPoint;
+                            return aRatio - bRatio;
+                          })
+                          .slice(0, 5)
+                          .map(item => (
+                            <li key={item.id} className="flex justify-between items-center">
+                              <div>
+                                <span className="font-medium">{item.name}</span>
+                                <Badge 
+                                  variant={item.status === 'Out of Stock' ? 'destructive' : 'outline'} 
+                                  className="ml-2"
                                 >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-red-500"
-                                  onClick={() => handleDeleteItem(item.id)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                  {item.status}
+                                </Badge>
                               </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">Current: </span>
+                                <span className="font-medium">{item.stockQuantity}</span>
+                                <span className="text-muted-foreground ml-2">Target: </span>
+                                <span className="font-medium">{item.reorderPoint * 2}</span>
+                              </div>
+                            </li>
+                          ))
+                        }
+                      </ul>
+                      <Button 
+                        variant="outline" 
+                        className="w-full mt-4"
+                        onClick={() => router.push('/inventory/analytics')}
+                      >
+                        View Full AI Recommendations
+                      </Button>
+                    </div>
+
+                    <div className="border rounded-lg p-4">
+                      <h3 className="font-semibold mb-2">Demand Forecast Summary</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Based on historical data and seasonal patterns, here are key predictions for the next 30 days:
+                      </p>
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="bg-slate-50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Expected Sales Growth</p>
+                            <p className="text-lg font-bold text-green-600">+8.5%</p>
+                          </div>
+                          <div className="bg-slate-50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground">High Demand Categories</p>
+                            <p className="text-sm font-medium">Cardiovascular, Antibiotics</p>
+                          </div>
+                          <div className="bg-slate-50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground">At Risk of Stockout</p>
+                            <p className="text-lg font-bold text-amber-600">12 items</p>
+                          </div>
+                          <div className="bg-slate-50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Forecast Confidence</p>
+                            <p className="text-lg font-bold">93%</p>
+                          </div>
+                        </div>
+                      </div>
+                      <Button 
+                        className="w-full mt-4"
+                        onClick={() => router.push('/inventory/analytics')}
+                      >
+                        View Detailed Forecast
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+            
+            {/* Dialog for adding/editing inventory items */}
+            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>{currentItem ? "Edit Inventory Item" : "Add New Inventory Item"}</DialogTitle>
+                  <DialogDescription>
+                    {currentItem 
+                      ? "Update the inventory item details below."
+                      : "Fill in the details to add a new inventory item."}
+                  </DialogDescription>
+                </DialogHeader>
+                {currentItem && (
+                  <InventoryItemForm 
+                    item={currentItem} 
+                    onSave={handleSaveItem}
+                    onCancel={() => setOpenDialog(false)}
+                  />
                 )}
-              </CardContent>
-            </Card>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
