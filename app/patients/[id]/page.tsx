@@ -10,7 +10,11 @@ export async function generateStaticParams() {
   }));
 }
 
-export default function PatientDetailPage({ params }: { params: { id: string } }) {
+type PatientPageProps = {
+  params: { id: string };
+}
+
+export default function PatientDetailPage({ params }: PatientPageProps) {
   // This is now a Server Component
   // It fetches data needed for generateStaticParams
   // and renders the client component, passing the ID
