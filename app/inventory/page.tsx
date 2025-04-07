@@ -76,6 +76,7 @@ interface Supplier {
   name: string;
 }
 
+// Original interface - keep for reference but we'll use the accurate one below
 interface InventoryItem {
   id: string;
   created_at: string;
@@ -91,6 +92,26 @@ interface InventoryItem {
   location: string | null;
   medications: Medication;
   suppliers?: Supplier;
+}
+
+// This interface represents the actual data structure returned from Supabase query
+interface InventoryItemFromDB {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  medication_id: string;
+  quantity: number;
+  batch_number: string | null;
+  expiration_date: string | null;
+  reorder_level: number;
+  location: string | null;
+  purchase_date: string | null;
+  purchase_price: number | null;
+  selling_price: number | null;
+  cost_price: number | null;
+  supplier_id: string | null;
+  medications: Medication;
+  suppliers: Supplier | null;
 }
 
 interface FormattedInventoryItem {
@@ -169,26 +190,26 @@ export default function InventoryPage() {
         if (data) {
           // Extract unique medication categories for filtering
           const allCategories = Array.from(new Set(data.map((item: any) => 
-            item.medications.dosage_form || 'Unknown'
+            item.medications?.dosage_form || 'Unknown'
           )));
           setCategories(allCategories);
 
           // Format data for the UI
-          const formattedItems = data.map((item: InventoryItem) => {
+          const formattedItems = data.map((item: any) => {
             const stockStatus = getStockStatus(item.quantity, item.reorder_level);
             return {
               id: item.id,
-              ndcCode: item.medications.ndc,
-              name: `${item.medications.name} ${item.medications.strength}`,
-              manufacturer: item.medications.manufacturer || 'Unknown',
+              ndcCode: item.medications?.ndc || '',
+              name: `${item.medications?.name || 'Unknown'} ${item.medications?.strength || ''}`,
+              manufacturer: item.medications?.manufacturer || 'Unknown',
               stockQuantity: item.quantity,
               reorderPoint: item.reorder_level,
-              unitPrice: item.selling_price,
-              costPrice: item.cost_price,
-              category: item.medications.dosage_form || 'Unknown',
+              unitPrice: item.selling_price || 0,
+              costPrice: item.cost_price || 0,
+              category: item.medications?.dosage_form || 'Unknown',
               status: stockStatus,
               lastUpdated: new Date(item.updated_at).toLocaleDateString(),
-              expirationDate: new Date(item.expiration_date).toLocaleDateString(),
+              expirationDate: item.expiration_date ? new Date(item.expiration_date).toLocaleDateString() : 'N/A',
               batchNumber: item.batch_number,
               location: item.location,
               medication_id: item.medication_id,
