@@ -265,13 +265,6 @@ export default function Dashboard() {
           <div className="bg-red-50 dark:bg-red-900/10 p-6 rounded-lg max-w-2xl">
             <h2 className="text-xl font-bold text-red-700 dark:text-red-300 mb-2">Dashboard Error</h2>
             <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
-            <Button 
-              variant="outline" 
-              onClick={() => window.location.reload()}
-              className="mr-2"
-            >
-              Reload Page
-            </Button>
             <Button onClick={() => router.push('/')}>
               Go Home
             </Button>
@@ -296,8 +289,7 @@ export default function Dashboard() {
                 </p>
               </div>
               <div className="flex items-center space-x-2">
-                <Button variant="outline" onClick={() => window.location.reload()}>Reload Data</Button>
-                <Button onClick={() => router.push('/debug')}>Debug Page</Button>
+                
               </div>
             </div>
 

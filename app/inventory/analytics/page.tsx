@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { MainNav } from "@/components/main-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Download, Filter } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { 
@@ -16,55 +15,18 @@ import {
 } from "@/components/ui/select";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Badge } from "@/components/ui/badge";
-import dynamic from 'next/dynamic';
 
-// Dynamically import recharts components with no SSR to avoid hydration issues
-const ChartComponents = dynamic(() => import('./chart-components'), { ssr: false });
-
-// Mock data for charts
-const stockTrendsData = [
-  { month: 'Jan', stock: 120, forecast: 110 },
-  { month: 'Feb', stock: 100, forecast: 95 },
-  { month: 'Mar', stock: 80, forecast: 75 },
-  { month: 'Apr', stock: 110, forecast: 105 },
-  { month: 'May', stock: 90, forecast: 85 },
-  { month: 'Jun', stock: 75, forecast: 70 },
-  { month: 'Jul', stock: 60, forecast: 65 },
-  { month: 'Aug', stock: 80, forecast: 80 },
-  { month: 'Sep', stock: 95, forecast: 90 },
-  { month: 'Oct', stock: 85, forecast: 85 },
-  { month: 'Nov', stock: 70, forecast: 75 },
-  { month: 'Dec', stock: 90, forecast: 95 },
-];
-
-const categoryDistributionData = [
-  { name: 'Cardiovascular', value: 35 },
-  { name: 'Diabetes', value: 20 },
-  { name: 'Gastrointestinal', value: 15 },
-  { name: 'Antibiotics', value: 10 },
-  { name: 'Pain Management', value: 15 },
-  { name: 'Other', value: 5 },
-];
-
-const stockStatusData = [
-  { name: 'In Stock', value: 65 },
-  { name: 'Low Stock', value: 25 },
-  { name: 'Out of Stock', value: 10 },
-];
-
-const topSellingItems = [
-  { name: 'Lisinopril 10mg', value: 320 },
-  { name: 'Metformin 500mg', value: 280 },
-  { name: 'Atorvastatin 40mg', value: 250 },
-  { name: 'Omeprazole 20mg', value: 210 },
-  { name: 'Simvastatin 20mg', value: 180 },
-];
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28BFF', '#FF6B6B'];
-const STATUS_COLORS = ['#22c55e', '#f59e0b', '#ef4444'];
+// Define recommendation interface
+interface Recommendation {
+  id: number | string;
+  title: string;
+  description: string;
+  impact: string;
+  category: string;
+}
 
 // Mock data for AI recommendations
-const mockRecommendations = [
+const mockRecommendations: Recommendation[] = [
   {
     id: 1,
     title: "Increase Stock for Lisinopril 10mg",
@@ -95,29 +57,10 @@ const mockRecommendations = [
   }
 ];
 
-// Fixed forecast data
-const forecastData = [
-  { month: 'Jan', actual: 120, forecast: 110, upperBound: 125, lowerBound: 95 },
-  { month: 'Feb', actual: 100, forecast: 95, upperBound: 110, lowerBound: 80 },
-  { month: 'Mar', actual: 80, forecast: 75, upperBound: 90, lowerBound: 60 },
-  { month: 'Apr', actual: 110, forecast: 105, upperBound: 120, lowerBound: 90 },
-  { month: 'May', actual: 90, forecast: 85, upperBound: 100, lowerBound: 70 },
-  { month: 'Jun', actual: 75, forecast: 70, upperBound: 85, lowerBound: 55 },
-  { month: 'Jul', actual: null, forecast: 65, upperBound: 80, lowerBound: 50 },
-  { month: 'Aug', actual: null, forecast: 75, upperBound: 90, lowerBound: 60 },
-  { month: 'Sep', actual: null, forecast: 90, upperBound: 105, lowerBound: 75 },
-  { month: 'Oct', actual: null, forecast: 100, upperBound: 115, lowerBound: 85 },
-  { month: 'Nov', actual: null, forecast: 80, upperBound: 95, lowerBound: 65 },
-  { month: 'Dec', actual: null, forecast: 95, upperBound: 110, lowerBound: 80 }
-];
-
 export default function InventoryAnalyticsPage() {
   const router = useRouter();
   const [recommendations, setRecommendations] = useState(mockRecommendations);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
-  const [selectedItem, setSelectedItem] = useState('all');
-  const [forecastPeriod, setForecastPeriod] = useState('months6');
-  const [forecastLoading, setForecastLoading] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
   // Handle client-side rendering
@@ -131,7 +74,7 @@ export default function InventoryAnalyticsPage() {
     setLoadingRecommendations(true);
     try {
       // Initialize the Gemini API
-      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
+      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
       // Prepare context for LLM
@@ -161,7 +104,14 @@ export default function InventoryAnalyticsPage() {
       // Parse JSON from response
       try {
         const jsonStr = text.match(/\[[\s\S]*\]/)?.[0] || '';
-        const newRecommendations = JSON.parse(jsonStr);
+        const parsedRecommendations = JSON.parse(jsonStr);
+        
+        // Ensure each recommendation has a unique id
+        const newRecommendations = parsedRecommendations.map((rec: any, index: number) => ({
+          ...rec,
+          id: rec.id || index + 1 // Use existing id or generate one based on index
+        }));
+        
         setRecommendations(newRecommendations);
       } catch (err) {
         console.error("Failed to parse AI recommendations:", err);
@@ -175,16 +125,6 @@ export default function InventoryAnalyticsPage() {
     } finally {
       setLoadingRecommendations(false);
     }
-  };
-
-  // Generate forecast for a specific item
-  const generateForecast = async () => {
-    setForecastLoading(true);
-    // In a real implementation, this would call an API with actual forecasting logic
-    // For now, we'll just simulate a delay and use the mock data
-    setTimeout(() => {
-      setForecastLoading(false);
-    }, 1500);
   };
 
   return (
@@ -206,7 +146,7 @@ export default function InventoryAnalyticsPage() {
                 </Button>
                 <h1 className="text-3xl font-bold">Inventory Analytics</h1>
                 <p className="text-muted-foreground">
-                  Analyze inventory trends, forecast demand, and optimize stock levels
+                  AI-powered inventory analysis and recommendations
                 </p>
               </div>
               <div className="flex items-center space-x-2">
@@ -251,25 +191,36 @@ export default function InventoryAnalyticsPage() {
                 <CardContent>
                   <div className="text-2xl font-bold">567</div>
                   <p className="text-xs text-muted-foreground">
-                    +12 from last month
+                    +2.5% from last month
                   </p>
                 </CardContent>
               </Card>
-
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">
-                    Avg. Turnover Rate
+                    Average Turnover Rate
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">3.2x</div>
                   <p className="text-xs text-muted-foreground">
-                    +0.4x from last month
+                    +0.3x from last month
                   </p>
                 </CardContent>
               </Card>
-
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Items Low in Stock
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">142</div>
+                  <p className="text-xs text-muted-foreground">
+                    25% of inventory
+                  </p>
+                </CardContent>
+              </Card>
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">
@@ -277,244 +228,54 @@ export default function InventoryAnalyticsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-amber-500">42</div>
+                  <div className="text-2xl font-bold">42</div>
                   <p className="text-xs text-muted-foreground">
-                    -15% from last month
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Forecast Accuracy
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">94.8%</div>
-                  <p className="text-xs text-muted-foreground">
-                    +2.1% from last month
+                    -12% from last month
                   </p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Analytics Tabs */}
-            <Tabs defaultValue="trends" className="space-y-4">
-              <TabsList className="w-full grid grid-cols-4">
-                <TabsTrigger value="trends">Inventory Trends</TabsTrigger>
-                <TabsTrigger value="distribution">Category Distribution</TabsTrigger>
-                <TabsTrigger value="forecast">Demand Forecast</TabsTrigger>
-                <TabsTrigger value="recommendations">AI Recommendations</TabsTrigger>
-              </TabsList>
-
-              {/* Inventory Trends Tab */}
-              <TabsContent value="trends" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Stock Level Trends</CardTitle>
-                      <CardDescription>
-                        12-month view of inventory levels
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div style={{ width: '100%', height: '300px' }}>
-                        {isClient && <ChartComponents.LineChart 
-                          data={stockTrendsData} 
-                          xAxisKey="month"
-                          lines={[
-                            { dataKey: "stock", color: "#8884d8", name: "Actual Stock" },
-                            { dataKey: "forecast", color: "#82ca9d", name: "Forecasted Stock", dash: true }
-                          ]}
-                        />}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Top Selling Items</CardTitle>
-                      <CardDescription>
-                        Most popular items by sales volume
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div style={{ width: '100%', height: '300px' }}>
-                        {isClient && <ChartComponents.BarChart 
-                          data={topSellingItems} 
-                          layout="vertical"
-                          xAxisKey="name"
-                          barKey="value"
-                          barName="Units Sold"
-                        />}
-                      </div>
-                    </CardContent>
-                  </Card>
+            {/* AI Recommendations */}
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>AI-Powered Recommendations</CardTitle>
+                  <Button 
+                    onClick={generateRecommendations} 
+                    disabled={loadingRecommendations}
+                    size="sm"
+                  >
+                    {loadingRecommendations ? 'Generating...' : 'Refresh'}
+                  </Button>
                 </div>
-              </TabsContent>
-
-              {/* Category Distribution Tab */}
-              <TabsContent value="distribution" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Category Distribution</CardTitle>
-                      <CardDescription>
-                        Inventory breakdown by category
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div style={{ width: '100%', height: '300px' }}>
-                        {isClient && <ChartComponents.PieChart 
-                          data={categoryDistributionData} 
-                          nameKey="name"
-                          valueKey="value"
-                          colors={COLORS}
-                        />}
+                <CardDescription>
+                  Smart recommendations to optimize your inventory
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="max-h-[600px] overflow-y-auto">
+                <div className="space-y-4">
+                  {recommendations.map((rec: Recommendation, index: number) => (
+                    <div key={rec.id || `rec-${index}`} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-medium">{rec.title}</h3>
+                        <Badge className={
+                          rec.impact === 'high' ? 'bg-red-500' : 
+                          rec.impact === 'medium' ? 'bg-yellow-500' : 'bg-blue-500'
+                        }>
+                          {rec.impact}
+                        </Badge>
                       </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Stock Status</CardTitle>
-                      <CardDescription>
-                        Current inventory status breakdown
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div style={{ width: '100%', height: '300px' }}>
-                        {isClient && <ChartComponents.PieChart 
-                          data={stockStatusData} 
-                          nameKey="name"
-                          valueKey="value"
-                          colors={STATUS_COLORS}
-                        />}
+                      <p className="text-sm text-muted-foreground mb-2">{rec.description}</p>
+                      <div className="flex justify-between items-center">
+                        <Badge variant="outline">{rec.category}</Badge>
+                        <Button variant="ghost" size="sm">Implement</Button>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  ))}
                 </div>
-              </TabsContent>
-
-              {/* Enhanced Demand Forecast Tab */}
-              <TabsContent value="forecast" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>AI-Powered Demand Forecast</CardTitle>
-                    <CardDescription>
-                      Predictive analysis for inventory demand with confidence intervals
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex flex-col md:flex-row justify-between gap-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">Product:</span>
-                        <Select 
-                          value={selectedItem} 
-                          onValueChange={setSelectedItem}
-                        >
-                          <SelectTrigger className="w-[220px]">
-                            <SelectValue placeholder="Select product" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Products</SelectItem>
-                            <SelectItem value="lisinopril">Lisinopril 10mg</SelectItem>
-                            <SelectItem value="metformin">Metformin 500mg</SelectItem>
-                            <SelectItem value="atorvastatin">Atorvastatin 40mg</SelectItem>
-                            <SelectItem value="omeprazole">Omeprazole 20mg</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">Forecast Period:</span>
-                        <Select 
-                          value={forecastPeriod} 
-                          onValueChange={setForecastPeriod}
-                        >
-                          <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Select period" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="months3">Next 3 Months</SelectItem>
-                            <SelectItem value="months6">Next 6 Months</SelectItem>
-                            <SelectItem value="months12">Next 12 Months</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button 
-                        onClick={generateForecast}
-                        disabled={forecastLoading}
-                      >
-                        {forecastLoading ? "Generating..." : "Generate Forecast"}
-                      </Button>
-                    </div>
-                    
-                    <div style={{ width: '100%', height: '400px' }} className="bg-slate-50 p-2 rounded-md">
-                      {isClient && <ChartComponents.ForecastChart data={forecastData} />}
-                    </div>
-                    
-                    <div className="bg-muted p-4 rounded-lg">
-                      <h3 className="font-semibold mb-2">Forecast Insights</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Based on historical sales patterns, seasonal trends, and market factors, 
-                        we predict a 12% increase in demand for cardiovascular medications in Q3, 
-                        with a potential 15-20% spike in September. Consider adjusting inventory 
-                        levels accordingly to prevent stockouts while minimizing carrying costs.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* AI Recommendations Tab */}
-              <TabsContent value="recommendations" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>AI-Generated Inventory Recommendations</CardTitle>
-                        <CardDescription>
-                          Smart suggestions to optimize your inventory management
-                        </CardDescription>
-                      </div>
-                      <Button 
-                        onClick={generateRecommendations}
-                        disabled={loadingRecommendations}
-                      >
-                        {loadingRecommendations ? "Generating..." : "Refresh Recommendations"}
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      {recommendations.map((rec) => (
-                        <div key={rec.id} className="border rounded-lg p-4">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-semibold text-lg">{rec.title}</h3>
-                            <Badge 
-                              variant={
-                                rec.impact === 'high' ? 'destructive' : 
-                                rec.impact === 'medium' ? 'default' : 'outline'
-                              }
-                            >
-                              {rec.impact} impact
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-3">
-                            {rec.description}
-                          </p>
-                          <div className="flex justify-between items-center">
-                            <Badge variant="outline">{rec.category}</Badge>
-                            <Button variant="outline" size="sm">Apply Recommendation</Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>

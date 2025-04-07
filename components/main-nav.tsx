@@ -34,7 +34,7 @@ export function MainNav() {
       <div className="flex items-center space-x-4">
         <div className="flex items-center space-x-2">
           <Pill className="h-6 w-6" />
-          <span className="font-bold">APMS</span>
+          <span className="font-bold">Pharm-AI</span>
         </div>
         <nav className="flex items-center space-x-6 text-sm font-medium">
           <Link

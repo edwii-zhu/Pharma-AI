@@ -96,17 +96,17 @@ const WarningCard = ({
                     </span>
                     {warning.severity === 'high' && (
                       <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-md font-bold">
-                        High Risk
+                        High
                       </span>
                     )}
                     {warning.severity === 'medium' && (
-                      <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-md font-bold">
-                        Medium Risk
+                      <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-md font-bold flex items-center">
+                        Medium
                       </span>
                     )}
                     {warning.severity === 'low' && (
                       <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-md font-bold">
-                        Low Risk
+                        Low
                       </span>
                     )}
                   </div>

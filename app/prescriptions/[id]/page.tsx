@@ -226,11 +226,11 @@ export default function PrescriptionDetailPage() {
   const getSeverityBadge = (severity: 'high' | 'medium' | 'low') => {
     switch (severity) {
       case 'high':
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">High Risk</Badge>;
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">High</Badge>;
       case 'medium':
-        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Medium Risk</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Medium</Badge>;
       case 'low':
-        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Low Risk</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Low</Badge>;
       default:
         return null;
     }

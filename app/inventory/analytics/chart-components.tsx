@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { 
   BarChart as RechartsBarChart, 
   Bar, 
@@ -13,7 +14,10 @@ import {
   ResponsiveContainer, 
   PieChart as RechartsPieChart, 
   Pie, 
-  Cell
+  Cell,
+  Area,
+  AreaChart,
+  ReferenceLine
 } from 'recharts';
 
 // Define the LayoutType since it's not directly exported from recharts
@@ -61,8 +65,26 @@ interface ForecastChartProps {
   data: DataPoint[];
 }
 
+// Create a single component that loads the right chart based on a type prop
+export default function ChartComponent(props: any) {
+  const { type, ...chartProps } = props;
+  
+  switch (type) {
+    case 'BarChart':
+      return <CustomBarChart {...chartProps} />;
+    case 'LineChart':
+      return <CustomLineChart {...chartProps} />;
+    case 'PieChart':
+      return <CustomPieChart {...chartProps} />;
+    case 'ForecastChart':
+      return <ForecastChart {...chartProps} />;
+    default:
+      return <div>Invalid chart type</div>;
+  }
+}
+
 // Wrapper for bar chart with simpler API
-export function CustomBarChart({ 
+function CustomBarChart({ 
   data, 
   layout = 'horizontal',
   xAxisKey = 'name', 
@@ -103,7 +125,7 @@ export function CustomBarChart({
 }
 
 // Wrapper for line chart with simpler API
-export function CustomLineChart({ 
+function CustomLineChart({ 
   data, 
   xAxisKey = 'name',
   lines = [{ dataKey: 'value', color: '#8884d8', name: 'Value' }]
@@ -144,7 +166,7 @@ export function CustomLineChart({
 }
 
 // Wrapper for pie chart with simpler API
-export function CustomPieChart({ 
+function CustomPieChart({ 
   data, 
   nameKey = 'name', 
   valueKey = 'value',
@@ -176,10 +198,17 @@ export function CustomPieChart({
 }
 
 // Specialized chart for forecast with confidence intervals
-export function ForecastChart({ data }: ForecastChartProps) {
+function ForecastChart({ data }: ForecastChartProps) {
+  if (!data || data.length === 0) {
+    return <div className="flex items-center justify-center h-full">No data available</div>;
+  }
+
+  // Find the current month index (last month with actual data)
+  const currentMonthIndex = data.findIndex(item => item.actual === null) - 1;
+  
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <RechartsLineChart
+      <AreaChart
         data={data}
         margin={{
           top: 20,
@@ -193,6 +222,44 @@ export function ForecastChart({ data }: ForecastChartProps) {
         <YAxis />
         <Tooltip />
         <Legend />
+        
+        {/* Confidence interval area */}
+        <defs>
+          <linearGradient id="confidenceGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#82ca9d" stopOpacity={0.2}/>
+            <stop offset="95%" stopColor="#82ca9d" stopOpacity={0.1}/>
+          </linearGradient>
+        </defs>
+        
+        <Area 
+          type="monotone" 
+          dataKey="upperBound" 
+          stroke="none" 
+          fill="url(#confidenceGradient)" 
+          fillOpacity={1}
+          name="Confidence Interval"
+        />
+        
+        <Area 
+          type="monotone" 
+          dataKey="lowerBound" 
+          stroke="none" 
+          fill="transparent" 
+          name="Lower Bound"
+          legendType="none"
+        />
+        
+        {/* Current month reference line */}
+        {currentMonthIndex >= 0 && (
+          <ReferenceLine 
+            x={data[currentMonthIndex].month} 
+            stroke="#666" 
+            strokeDasharray="3 3" 
+            label="Current" 
+          />
+        )}
+        
+        {/* Actual demand line */}
         <Line 
           type="monotone" 
           dataKey="actual" 
@@ -202,49 +269,17 @@ export function ForecastChart({ data }: ForecastChartProps) {
           name="Historical Demand"
           connectNulls={true}
         />
+        
+        {/* Forecast line */}
         <Line 
           type="monotone" 
           dataKey="forecast" 
           stroke="#82ca9d" 
           strokeWidth={2}
           name="Forecasted Demand"
+          connectNulls={true}
         />
-        <Line 
-          type="monotone" 
-          dataKey="upperBound" 
-          stroke="#82ca9d" 
-          strokeWidth={1}
-          strokeDasharray="3 3"
-          name="Upper Bound (95% CI)"
-          strokeOpacity={0.6}
-        />
-        <Line 
-          type="monotone" 
-          dataKey="lowerBound" 
-          stroke="#82ca9d" 
-          strokeWidth={1}
-          strokeDasharray="3 3"
-          name="Lower Bound (95% CI)"
-          strokeOpacity={0.6}
-        />
-      </RechartsLineChart>
+      </AreaChart>
     </ResponsiveContainer>
   );
-}
-
-// Export the components with their renamed versions
-export { 
-  ResponsiveContainer,
-  CustomBarChart as BarChart,
-  CustomLineChart as LineChart,
-  CustomPieChart as PieChart,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  Pie,
-  Cell
-}; 
+} 

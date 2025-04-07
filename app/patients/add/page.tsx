@@ -452,7 +452,7 @@ export default function AddPatientPage() {
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragging ? 'border-primary bg-primary/10' : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'}`}
+                  className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragging ? 'border-primary bg-primary/10' : 'border-gray-300 hover:border-gray-400 hover:bg-gray-900'}`}
                 >
                   <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
                     <Upload className="w-10 h-10 mb-3 text-gray-400" />
@@ -477,7 +477,7 @@ export default function AddPatientPage() {
                     <h4 className="text-sm font-medium">Selected Files:</h4>
                     <ul className="space-y-2">
                       {files.map((file, index) => (
-                        <li key={index} className="flex items-center justify-between p-2 border rounded-md bg-white">
+                        <li key={index} className="flex items-center justify-between p-2 border rounded-md bg-black">
                           <div className="flex items-center gap-2 overflow-hidden">
                             {getFileIcon(file)}
                             <span className="text-sm font-medium truncate flex-1" title={file.name}>{file.name}</span>

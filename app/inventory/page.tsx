@@ -386,9 +386,8 @@ export default function InventoryPage() {
 
             {/* Add tabs for different views */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="inventory">Inventory List</TabsTrigger>
-                <TabsTrigger value="visualizations">Visualizations</TabsTrigger>
                 <TabsTrigger value="forecasting">AI Insights</TabsTrigger>
               </TabsList>
 
@@ -777,21 +776,21 @@ export default function InventoryPage() {
                       </p>
                       <div className="space-y-2">
                         <div className="grid grid-cols-2 gap-2">
-                          <div className="bg-slate-50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground">Expected Sales Growth</p>
-                            <p className="text-lg font-bold text-green-600">+8.5%</p>
+                          <div className="bg-slate-900 p-3 rounded-lg">
+                            <p className="text-xs text-slate-400">Expected Sales Growth</p>
+                            <p className="text-lg font-bold text-green-500">+8.5%</p>
                           </div>
-                          <div className="bg-slate-50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground">High Demand Categories</p>
-                            <p className="text-sm font-medium">Cardiovascular, Antibiotics</p>
+                          <div className="bg-slate-900 p-3 rounded-lg">
+                            <p className="text-xs text-slate-400">High Demand Categories</p>
+                            <p className="text-sm font-medium text-slate-100">Cardiovascular, Antibiotics</p>
                           </div>
-                          <div className="bg-slate-50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground">At Risk of Stockout</p>
-                            <p className="text-lg font-bold text-amber-600">12 items</p>
+                          <div className="bg-slate-900 p-3 rounded-lg">
+                            <p className="text-xs text-slate-400">At Risk of Stockout</p>
+                            <p className="text-lg font-bold text-amber-500">12 items</p>
                           </div>
-                          <div className="bg-slate-50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground">Forecast Confidence</p>
-                            <p className="text-lg font-bold">93%</p>
+                          <div className="bg-slate-900 p-3 rounded-lg">
+                            <p className="text-xs text-slate-400">Forecast Confidence</p>
+                            <p className="text-lg font-bold text-slate-100">93%</p>
                           </div>
                         </div>
                       </div>
