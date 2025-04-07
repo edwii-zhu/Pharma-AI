@@ -80,3 +80,13 @@ AI integration in our pharmacy system offers several significant benefits:
 5. **Decision Support**: AI recommendations provide pharmacists with data-driven insights to make better clinical and business decisions.
 
 6. **Scalability**: The system can handle increasing workloads without proportional increases in staffing needs.
+
+### Looking into the future
+
+1. **Fine Tuning LLM**: Tuning an LLM to search specifically for medical studies can make it even more accurate and up to date than the best doctors.
+
+2. **Data Protection**: Extensive encryption to store sensitive patient data.
+
+3. **Custom Image Recognition**: Training a custom Image Recognition software with handwriting samples can allow the software to be even more accurate at reading unclear handwriting.
+
+4. **Integration with existing Tools**: Making AI features accessible to pharmacies still stuck on older software.
