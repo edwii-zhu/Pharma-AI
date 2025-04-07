@@ -80,7 +80,6 @@ export async function POST(request: Request) {
 Patient Information:
 - Name: ${patientData.first_name} ${patientData.last_name}
 - Age: ${calculateAge(patientData.date_of_birth)}
-- Gender: ${patientData.gender || 'Not specified'}
 - Allergies: ${patientData.allergies || 'None'}
 - Medical conditions: ${patientData.medical_conditions || 'None'}
 
