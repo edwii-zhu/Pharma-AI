@@ -11,13 +11,14 @@ export async function generateStaticParams() {
 }
 
 type Props = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
-export default async function PatientDetailPage({ params }: Props) {
+export default async function PatientDetailPage(props: Props) {
+  const params = await props.params;
   // Extract and validate the ID from params
   const { id } = params;
-  
+
   try {
     // In Next.js 14, we need to await the data fetch in the server component
     await getPatientById(id);
