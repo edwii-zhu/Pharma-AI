@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { MainNav } from "@/components/main-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,13 +17,10 @@ import { Database } from "@/lib/database.types";
 type Patient = Database['public']['Tables']['patients']['Row'];
 type PatientUpdate = Database['public']['Tables']['patients']['Update'];
 
-// This is required for static site generation with dynamic routes
-export async function generateStaticParams() {
-  return [];
-}
-
-export default function EditPatientPage({ params }: { params: { id: string } }) {
+export default function EditPatientPage() {
   const router = useRouter();
+  const params = useParams();
+  const patientId = typeof params?.id === 'string' ? params.id : '';
   const { toast } = useToast();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,17 +31,23 @@ export default function EditPatientPage({ params }: { params: { id: string } }) 
   const [allergiesText, setAllergiesText] = useState<string>('');
   const [medicalConditionsText, setMedicalConditionsText] = useState<string>('');
   
-  // State for form data
+  // State for form data with explicitly defined properties
   const [formData, setFormData] = useState<PatientUpdate>({});
   
   useEffect(() => {
+    if (!patientId) {
+      setError("Invalid patient ID");
+      setLoading(false);
+      return;
+    }
+    
     async function fetchPatient() {
       try {
         setLoading(true);
-        const data = await getPatientById(params.id);
+        const data = await getPatientById(patientId);
         setPatient(data);
         
-        // Initialize form data
+        // Initialize form data with only valid fields
         setFormData({
           first_name: data.first_name,
           last_name: data.last_name,
@@ -53,7 +56,6 @@ export default function EditPatientPage({ params }: { params: { id: string } }) 
           phone: data.phone,
           email: data.email,
           insurance_provider: data.insurance_provider,
-          insurance_policy_number: data.insurance_policy_number,
           insurance_group_number: data.insurance_group_number,
           allergies: data.allergies,
           medical_conditions: data.medical_conditions,
@@ -76,7 +78,7 @@ export default function EditPatientPage({ params }: { params: { id: string } }) 
     }
     
     fetchPatient();
-  }, [params.id]);
+  }, [patientId]);
   
   // Update allergies array when text changes
   useEffect(() => {
@@ -140,7 +142,7 @@ export default function EditPatientPage({ params }: { params: { id: string } }) 
       }
       
       // Update the patient
-      const updatedPatient = await updatePatient(params.id, formData);
+      const updatedPatient = await updatePatient(patientId, formData);
       
       toast({
         title: "Patient updated successfully",
@@ -148,7 +150,7 @@ export default function EditPatientPage({ params }: { params: { id: string } }) 
       });
       
       // Redirect to the patient detail page
-      router.push(`/patients/${params.id}`);
+      router.push(`/patients/${patientId}`);
     } catch (error) {
       console.error("Error updating patient:", error);
       toast({
@@ -321,17 +323,6 @@ export default function EditPatientPage({ params }: { params: { id: string } }) 
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="insurance_policy_number">Policy Number</Label>
-                        <Input
-                          id="insurance_policy_number"
-                          name="insurance_policy_number"
-                          placeholder="Policy number"
-                          value={formData.insurance_policy_number || ''}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      
                       <div className="space-y-2">
                         <Label htmlFor="insurance_group_number">Group Number</Label>
                         <Input
