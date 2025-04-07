@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainNav } from "@/components/main-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,9 +39,42 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
-// Mock data for inventory items
+// Define the inventory item interface based on the database schema
+interface Medication {
+  id: string;
+  name: string;
+  ndc: string;
+  manufacturer: string;
+  dosage_form: string;
+  strength: string;
+}
+
+interface Supplier {
+  id: string;
+  name: string;
+}
+
 interface InventoryItem {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  medication_id: string;
+  quantity: number;
+  batch_number: string | null;
+  expiration_date: string;
+  cost_price: number;
+  selling_price: number;
+  supplier_id: string | null;
+  reorder_level: number;
+  location: string | null;
+  medications: Medication;
+  suppliers?: Supplier;
+}
+
+interface FormattedInventoryItem {
   id: string;
   ndcCode: string;
   name: string;
@@ -49,73 +82,16 @@ interface InventoryItem {
   stockQuantity: number;
   reorderPoint: number;
   unitPrice: number;
+  costPrice: number;
   category: string;
   status: 'In Stock' | 'Low Stock' | 'Out of Stock';
   lastUpdated: string;
+  expirationDate: string;
+  batchNumber: string | null;
+  location: string | null;
+  medication_id: string;
+  supplier_id: string | null;
 }
-
-const mockInventoryData: InventoryItem[] = [
-  {
-    id: "1",
-    ndcCode: "0002-3232-30",
-    name: "Lisinopril 10mg",
-    manufacturer: "Lupin Pharmaceuticals",
-    stockQuantity: 250,
-    reorderPoint: 50,
-    unitPrice: 0.87,
-    category: "Cardiovascular",
-    status: "In Stock",
-    lastUpdated: "2024-04-05T12:00:00Z"
-  },
-  {
-    id: "2",
-    ndcCode: "0069-2700-30",
-    name: "Metformin 500mg",
-    manufacturer: "Bristol-Myers Squibb",
-    stockQuantity: 35,
-    reorderPoint: 40,
-    unitPrice: 0.32,
-    category: "Diabetes",
-    status: "Low Stock",
-    lastUpdated: "2024-04-04T15:30:00Z"
-  },
-  {
-    id: "3",
-    ndcCode: "0378-3225-05",
-    name: "Simvastatin 20mg",
-    manufacturer: "Mylan",
-    stockQuantity: 0,
-    reorderPoint: 30,
-    unitPrice: 0.25,
-    category: "Cardiovascular",
-    status: "Out of Stock",
-    lastUpdated: "2024-04-03T09:45:00Z"
-  },
-  {
-    id: "4",
-    ndcCode: "0093-5260-01",
-    name: "Omeprazole 20mg",
-    manufacturer: "Teva",
-    stockQuantity: 125,
-    reorderPoint: 40,
-    unitPrice: 0.57,
-    category: "Gastrointestinal",
-    status: "In Stock",
-    lastUpdated: "2024-04-02T14:20:00Z"
-  },
-  {
-    id: "5",
-    ndcCode: "0781-5180-31",
-    name: "Atorvastatin 40mg",
-    manufacturer: "Sandoz",
-    stockQuantity: 78,
-    reorderPoint: 50,
-    unitPrice: 0.93,
-    category: "Cardiovascular",
-    status: "In Stock",
-    lastUpdated: "2024-04-01T10:15:00Z"
-  }
-];
 
 // Determine badge color based on stock status
 const getStatusBadgeVariant = (status: string) => {
@@ -131,13 +107,87 @@ const getStatusBadgeVariant = (status: string) => {
   }
 };
 
+// Function to determine stock status
+const getStockStatus = (quantity: number, reorderLevel: number): 'In Stock' | 'Low Stock' | 'Out of Stock' => {
+  if (quantity === 0) return 'Out of Stock';
+  if (quantity <= reorderLevel) return 'Low Stock';
+  return 'In Stock';
+};
+
 export default function InventoryPage() {
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(mockInventoryData);
+  const router = useRouter();
+  const [inventoryItems, setInventoryItems] = useState<FormattedInventoryItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [openDialog, setOpenDialog] = useState(false);
-  const [currentItem, setCurrentItem] = useState<InventoryItem | null>(null);
+  const [currentItem, setCurrentItem] = useState<FormattedInventoryItem | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+
+  // Fetch inventory data from Supabase
+  useEffect(() => {
+    async function fetchInventory() {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('inventory')
+          .select(`
+            *,
+            medications (
+              id, name, ndc, manufacturer, dosage_form, strength
+            ),
+            suppliers (id, name)
+          `)
+          .order('updated_at', { ascending: false });
+
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          // Extract unique medication categories for filtering
+          const allCategories = Array.from(new Set(data.map((item: any) => 
+            item.medications.dosage_form || 'Unknown'
+          )));
+          setCategories(allCategories);
+
+          // Format data for the UI
+          const formattedItems = data.map((item: InventoryItem) => {
+            const stockStatus = getStockStatus(item.quantity, item.reorder_level);
+            return {
+              id: item.id,
+              ndcCode: item.medications.ndc,
+              name: `${item.medications.name} ${item.medications.strength}`,
+              manufacturer: item.medications.manufacturer || 'Unknown',
+              stockQuantity: item.quantity,
+              reorderPoint: item.reorder_level,
+              unitPrice: item.selling_price,
+              costPrice: item.cost_price,
+              category: item.medications.dosage_form || 'Unknown',
+              status: stockStatus,
+              lastUpdated: new Date(item.updated_at).toLocaleDateString(),
+              expirationDate: new Date(item.expiration_date).toLocaleDateString(),
+              batchNumber: item.batch_number,
+              location: item.location,
+              medication_id: item.medication_id,
+              supplier_id: item.supplier_id
+            };
+          });
+          
+          setInventoryItems(formattedItems);
+        }
+      } catch (err) {
+        console.error('Error fetching inventory:', err);
+        setError('Failed to load inventory items');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchInventory();
+  }, []);
 
   // Filter inventory items based on search term and filters
   const filteredItems = inventoryItems.filter(item => {
@@ -152,22 +202,76 @@ export default function InventoryPage() {
   });
 
   // Handler for adding/editing an item
-  const handleSaveItem = (item: InventoryItem) => {
-    if (currentItem) {
-      // Edit existing item
-      setInventoryItems(prev => prev.map(i => i.id === item.id ? item : i));
-    } else {
-      // Add new item
-      setInventoryItems(prev => [...prev, { ...item, id: (prev.length + 1).toString() }]);
+  const handleSaveItem = async (item: FormattedInventoryItem) => {
+    try {
+      setLoading(true);
+      
+      if (currentItem) {
+        // Edit existing item
+        const { error } = await supabase
+          .from('inventory')
+          .update({
+            quantity: item.stockQuantity,
+            reorder_level: item.reorderPoint,
+            cost_price: item.costPrice,
+            selling_price: item.unitPrice,
+            location: item.location,
+            batch_number: item.batchNumber,
+            expiration_date: new Date(item.expirationDate).toISOString(),
+            supplier_id: item.supplier_id
+          })
+          .eq('id', item.id);
+          
+        if (error) throw error;
+        
+        // Update local state
+        setInventoryItems(prev => prev.map(i => i.id === item.id ? {
+          ...i,
+          stockQuantity: item.stockQuantity,
+          reorderPoint: item.reorderPoint,
+          unitPrice: item.unitPrice,
+          costPrice: item.costPrice,
+          location: item.location,
+          batchNumber: item.batchNumber,
+          expirationDate: item.expirationDate,
+          status: getStockStatus(item.stockQuantity, item.reorderPoint),
+          lastUpdated: new Date().toLocaleDateString()
+        } : i));
+      } else {
+        // This is simplified - in a real app you'd need to handle creating new inventory items
+        // which would require selecting a medication and supplier
+        alert("Adding new items requires selecting medication and supplier. Please use the full interface.");
+      }
+    } catch (err) {
+      console.error('Error saving inventory item:', err);
+      alert('Failed to save changes');
+    } finally {
+      setLoading(false);
+      setOpenDialog(false);
+      setCurrentItem(null);
     }
-    setOpenDialog(false);
-    setCurrentItem(null);
   };
 
   // Handler for deleting an item
-  const handleDeleteItem = (id: string) => {
+  const handleDeleteItem = async (id: string) => {
     if (confirm("Are you sure you want to delete this item?")) {
-      setInventoryItems(prev => prev.filter(item => item.id !== id));
+      try {
+        setLoading(true);
+        const { error } = await supabase
+          .from('inventory')
+          .delete()
+          .eq('id', id);
+          
+        if (error) throw error;
+        
+        // Update local state
+        setInventoryItems(prev => prev.filter(item => item.id !== id));
+      } catch (err) {
+        console.error('Error deleting inventory item:', err);
+        alert('Failed to delete item');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -186,7 +290,11 @@ export default function InventoryPage() {
                 </p>
               </div>
               <div className="flex items-center space-x-2">
-                <Button variant="outline" className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                  onClick={() => router.push('/inventory/analytics')}
+                >
                   <BarChart4 className="h-4 w-4" />
                   Analytics
                 </Button>
@@ -204,19 +312,14 @@ export default function InventoryPage() {
                     <DialogHeader>
                       <DialogTitle>{currentItem ? "Edit Inventory Item" : "Add New Inventory Item"}</DialogTitle>
                       <DialogDescription>
-                        Fill in the details for the inventory item
+                        {currentItem ? "Update the details of this inventory item." : "Enter the details of the new inventory item."}
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <InventoryItemForm 
-                        item={currentItem} 
-                        onSave={handleSaveItem} 
-                        onCancel={() => {
-                          setOpenDialog(false);
-                          setCurrentItem(null);
-                        }}
-                      />
-                    </div>
+                    <InventoryItemForm 
+                      item={currentItem} 
+                      onSave={handleSaveItem} 
+                      onCancel={() => setOpenDialog(false)} 
+                    />
                   </DialogContent>
                 </Dialog>
               </div>
@@ -276,30 +379,31 @@ export default function InventoryPage() {
             </div>
 
             {/* Filters and Search */}
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  className="pl-10" 
-                  placeholder="Search by name, NDC code, or manufacturer..." 
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search by name, NDC, or manufacturer..."
+                  className="pl-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <div className="flex flex-row gap-2">
+              <div className="flex flex-1 sm:flex-none gap-2">
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[150px]">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    <SelectItem value="Cardiovascular">Cardiovascular</SelectItem>
-                    <SelectItem value="Diabetes">Diabetes</SelectItem>
-                    <SelectItem value="Gastrointestinal">Gastrointestinal</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>{category}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[150px]">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -315,72 +419,75 @@ export default function InventoryPage() {
             {/* Inventory Table */}
             <Card>
               <CardHeader>
-                <CardTitle>Inventory Items</CardTitle>
+                <CardTitle>Inventory Items ({filteredItems.length})</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>NDC Code</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Manufacturer</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Quantity</TableHead>
-                      <TableHead className="text-right">Unit Price</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredItems.length > 0 ? (
-                      filteredItems.map(item => (
-                        <TableRow key={item.id}>
-                          <TableCell>{item.ndcCode}</TableCell>
-                          <TableCell>{item.name}</TableCell>
-                          <TableCell>{item.manufacturer}</TableCell>
-                          <TableCell>{item.category}</TableCell>
-                          <TableCell className="text-right">{item.stockQuantity}</TableCell>
-                          <TableCell className="text-right">${item.unitPrice.toFixed(2)}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant={getStatusBadgeVariant(item.status) as any}>
-                              {item.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button 
-                                size="icon" 
-                                variant="ghost"
-                                onClick={() => {
-                                  setCurrentItem(item);
-                                  setOpenDialog(true);
-                                }}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                size="icon" 
-                                variant="ghost"
-                                onClick={() => handleDeleteItem(item.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
+                {filteredItems.length === 0 ? (
+                  <div className="text-center p-4 text-muted-foreground">
+                    No matching inventory items found.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product</TableHead>
+                          <TableHead>NDC</TableHead>
+                          <TableHead>Manufacturer</TableHead>
+                          <TableHead className="text-right">Stock</TableHead>
+                          <TableHead className="text-right">Price</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Last Updated</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center py-4">
-                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                            <AlertCircle className="h-8 w-8" />
-                            <p>No inventory items found</p>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredItems.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell>{item.ndcCode}</TableCell>
+                            <TableCell>{item.manufacturer}</TableCell>
+                            <TableCell className="text-right">
+                              {item.stockQuantity} 
+                              {item.stockQuantity <= item.reorderPoint && (
+                                <span className="ml-1 text-xs text-yellow-500" title="Below reorder point">
+                                  (Min: {item.reorderPoint})
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">${item.unitPrice.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Badge variant={getStatusBadgeVariant(item.status) as any}>{item.status}</Badge>
+                            </TableCell>
+                            <TableCell>{item.lastUpdated}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    setCurrentItem(item);
+                                    setOpenDialog(true);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-red-500"
+                                  onClick={() => handleDeleteItem(item.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -392,114 +499,88 @@ export default function InventoryPage() {
 
 // Form component for adding/editing inventory items
 interface InventoryItemFormProps {
-  item: InventoryItem | null;
-  onSave: (item: InventoryItem) => void;
+  item: FormattedInventoryItem | null;
+  onSave: (item: FormattedInventoryItem) => void;
   onCancel: () => void;
 }
 
 function InventoryItemForm({ item, onSave, onCancel }: InventoryItemFormProps) {
-  const [formData, setFormData] = useState<Partial<InventoryItem>>(
+  const [formData, setFormData] = useState<FormattedInventoryItem>(
     item || {
-      ndcCode: "",
-      name: "",
-      manufacturer: "",
+      id: '',
+      ndcCode: '',
+      name: '',
+      manufacturer: '',
       stockQuantity: 0,
-      reorderPoint: 0,
+      reorderPoint: 10,
       unitPrice: 0,
-      category: "",
-      status: "In Stock",
-      lastUpdated: new Date().toISOString()
+      costPrice: 0,
+      category: '',
+      status: 'Out of Stock',
+      lastUpdated: new Date().toLocaleDateString(),
+      expirationDate: new Date().toLocaleDateString(),
+      batchNumber: '',
+      location: '',
+      medication_id: '',
+      supplier_id: null
     }
   );
 
+  // Handle form field changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
+    
+    // Convert number inputs to actual numbers
+    const processedValue = type === 'number' ? 
+      name === 'unitPrice' || name === 'costPrice' ? parseFloat(value) : parseInt(value, 10) 
+      : value;
+    
     setFormData(prev => ({
       ...prev,
-      [name]: name === "stockQuantity" || name === "reorderPoint" || name === "unitPrice" 
-        ? parseFloat(value) 
-        : value
+      [name]: processedValue
     }));
   };
 
+  // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Calculate status based on stock quantity and reorder point
-    let status: 'In Stock' | 'Low Stock' | 'Out of Stock';
-    if (formData.stockQuantity === 0) {
-      status = 'Out of Stock';
-    } else if (formData.stockQuantity && formData.reorderPoint && formData.stockQuantity <= formData.reorderPoint) {
-      status = 'Low Stock';
-    } else {
-      status = 'In Stock';
-    }
+    // Calculate status based on quantity and reorder point
+    const status = formData.stockQuantity === 0 
+      ? 'Out of Stock' 
+      : formData.stockQuantity <= formData.reorderPoint 
+        ? 'Low Stock' 
+        : 'In Stock';
     
+    // Pass updated form data to parent component
     onSave({
       ...formData,
-      id: item?.id || "new",
-      stockQuantity: formData.stockQuantity || 0,
-      reorderPoint: formData.reorderPoint || 0,
-      unitPrice: formData.unitPrice || 0,
-      status,
-      lastUpdated: new Date().toISOString()
-    } as InventoryItem);
+      status
+    });
   };
 
+  // Render form
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="ndcCode">NDC Code</Label>
-          <Input
-            id="ndcCode"
-            name="ndcCode"
-            value={formData.ndcCode}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="name">Medication Name</Label>
-          <Input
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="manufacturer">Manufacturer</Label>
-          <Input
-            id="manufacturer"
-            name="manufacturer"
-            value={formData.manufacturer}
-            onChange={handleChange}
-            required
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="category">Category</Label>
-          <Select 
-            value={formData.category} 
-            onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Cardiovascular">Cardiovascular</SelectItem>
-              <SelectItem value="Diabetes">Diabetes</SelectItem>
-              <SelectItem value="Gastrointestinal">Gastrointestinal</SelectItem>
-              <SelectItem value="Antibiotics">Antibiotics</SelectItem>
-              <SelectItem value="Pain Management">Pain Management</SelectItem>
-              <SelectItem value="Other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="stockQuantity">Stock Quantity</Label>
+    <form onSubmit={handleSubmit}>
+      <div className="grid gap-4 py-4">
+        {item && (
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="name" className="text-right">
+              Product
+            </Label>
+            <Input
+              id="name"
+              name="name"
+              value={formData.name}
+              disabled={true}
+              className="col-span-3"
+            />
+          </div>
+        )}
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="stockQuantity" className="text-right">
+            Quantity
+          </Label>
           <Input
             id="stockQuantity"
             name="stockQuantity"
@@ -507,11 +588,14 @@ function InventoryItemForm({ item, onSave, onCancel }: InventoryItemFormProps) {
             min="0"
             value={formData.stockQuantity}
             onChange={handleChange}
+            className="col-span-3"
             required
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="reorderPoint">Reorder Point</Label>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="reorderPoint" className="text-right">
+            Reorder Point
+          </Label>
           <Input
             id="reorderPoint"
             name="reorderPoint"
@@ -519,29 +603,86 @@ function InventoryItemForm({ item, onSave, onCancel }: InventoryItemFormProps) {
             min="0"
             value={formData.reorderPoint}
             onChange={handleChange}
+            className="col-span-3"
             required
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="unitPrice">Unit Price ($)</Label>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="costPrice" className="text-right">
+            Cost Price ($)
+          </Label>
+          <Input
+            id="costPrice"
+            name="costPrice"
+            type="number"
+            min="0"
+            step="0.01"
+            value={formData.costPrice}
+            onChange={handleChange}
+            className="col-span-3"
+            required
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="unitPrice" className="text-right">
+            Selling Price ($)
+          </Label>
           <Input
             id="unitPrice"
             name="unitPrice"
             type="number"
-            step="0.01"
             min="0"
+            step="0.01"
             value={formData.unitPrice}
             onChange={handleChange}
+            className="col-span-3"
             required
           />
         </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="batchNumber" className="text-right">
+            Batch Number
+          </Label>
+          <Input
+            id="batchNumber"
+            name="batchNumber"
+            value={formData.batchNumber || ''}
+            onChange={handleChange}
+            className="col-span-3"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="expirationDate" className="text-right">
+            Expiration Date
+          </Label>
+          <Input
+            id="expirationDate"
+            name="expirationDate"
+            type="date"
+            value={formData.expirationDate}
+            onChange={handleChange}
+            className="col-span-3"
+            required
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="location" className="text-right">
+            Location
+          </Label>
+          <Input
+            id="location"
+            name="location"
+            value={formData.location || ''}
+            onChange={handleChange}
+            className="col-span-3"
+          />
+        </div>
       </div>
-      
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit">{item ? "Update Item" : "Add Item"}</Button>
+        <Button type="submit">Save Changes</Button>
       </DialogFooter>
     </form>
   );

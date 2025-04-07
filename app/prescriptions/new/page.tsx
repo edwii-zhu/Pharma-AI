@@ -1,17 +1,21 @@
-'use client';
+import type { Metadata } from "next";
+import { MainNav } from "@/components/main-nav";
+import PrescriptionProcessor from "@/components/PrescriptionProcessor";
 
-import { MainNav } from "@/components/main-nav"
-import PrescriptionProcessor from "@/components/PrescriptionProcessor"
+export const metadata: Metadata = {
+  title: "New Prescription | Pharma-AI",
+  description: "Create a new prescription using OCR technology",
+};
 
-export default function Page() {
+const Page = () => {
   return (
     <div className="flex min-h-screen flex-col">
       <MainNav />
-      <main className="flex-1">
-        <div className="container py-6">
-          <PrescriptionProcessor />
-        </div>
-      </main>
+      <div className="container mx-auto py-6 px-4 flex-1">
+        <PrescriptionProcessor />
+      </div>
     </div>
-  )
-} 
+  );
+};
+
+export default Page; 

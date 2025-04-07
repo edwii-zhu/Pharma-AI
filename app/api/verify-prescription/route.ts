@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const { status, prescriptionData } = await request.json();
+    const { status, prescriptionData, contraindicationData } = await request.json();
 
     if (!status || !prescriptionData) {
       return NextResponse.json(
@@ -20,6 +20,7 @@ export async function POST(request: Request) {
     const verificationRecord = {
       status,
       prescriptionData,
+      contraindicationData,
       verifiedAt: new Date().toISOString(),
       verifiedBy: 'pharmacist_id', // This would come from the authenticated session
     };

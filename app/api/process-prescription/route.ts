@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createWorker } from 'tesseract.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { initTesseract } from '@/lib/tesseract-config';
+import { PSM } from 'tesseract.js';
 
 // Initialize Gemini AI client
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '');
@@ -9,8 +11,19 @@ const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 // For development/testing - set to true to bypass OCR and return mock data
 const USE_MOCK_DATA = false;
 
-// OCR timeout in milliseconds (60 seconds)
-const OCR_TIMEOUT = 60000;
+// OCR timeout in milliseconds (90 seconds)
+const OCR_TIMEOUT = 90000;
+
+// Tesseract job options to improve OCR quality and speed
+const TESSERACT_JOB_OPTIONS = {
+  load_system_dawg: 0,     // Don't load dictionary
+  load_freq_dawg: 0,       // Don't load frequency dictionary
+  load_number_dawg: 0,     // Don't load number patterns dictionary
+  load_punc_dawg: 0,       // Don't load punctuation patterns dictionary
+  tessedit_ocr_engine_mode: 1, // 1 = Neural nets LSTM only
+  tessedit_pageseg_mode: PSM.SINGLE_BLOCK, // Assume a single uniform block of text
+  preserve_interword_spaces: '1',
+};
 
 export async function POST(request: Request) {
   try {
@@ -24,7 +37,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // Convert File to Buffer for OCR processing
+    // Check file size - reject if too large
+    const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { 
+          error: 'File too large', 
+          details: 'Maximum file size is 15MB. Large files may cause timeouts.'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Convert File to Buffer for processing
     const buffer = Buffer.from(await file.arrayBuffer());
 
     // Extract text from prescription
@@ -48,32 +73,11 @@ export async function POST(request: Request) {
         DATE: 06/15/2023
       `;
     } else {
-      // Perform OCR using Tesseract.js with timeout handling
+      // Use OCR for all files (both images and PDFs)
+      console.log(`Processing ${file.type} with OCR`);
+      
       try {
-        // Create a timeout promise
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('OCR processing timed out')), OCR_TIMEOUT); // 60 seconds timeout
-        });
-        
-        // Create the OCR promise
-        const ocrPromise = async () => {
-          try {
-            const worker = await createWorker('eng'); // Use simpler version directly
-            const result = await worker.recognize(buffer);
-            await worker.terminate();
-            return result.data.text;
-          } catch (err) {
-            console.error('Error in OCR processing:', err);
-            throw new Error('OCR processing failed: ' + (err instanceof Error ? err.message : String(err)));
-          }
-        };
-        
-        // Race the promises
-        text = await Promise.race([ocrPromise(), timeoutPromise]) as string;
-        
-        if (!text || text.trim().length === 0) {
-          throw new Error('OCR produced empty text. The image may be unclear or in an unsupported format.');
-        }
+        text = await performOCR(buffer);
       } catch (ocrError) {
         console.error('OCR processing error:', ocrError);
         return NextResponse.json(
@@ -83,6 +87,10 @@ export async function POST(request: Request) {
           },
           { status: 500 }
         );
+      }
+      
+      if (!text || text.trim().length === 0) {
+        throw new Error('Text extraction produced empty text. The file may be unclear or in an unsupported format.');
       }
     }
 
@@ -178,4 +186,37 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Performs OCR on an image or PDF buffer using Tesseract.js
+ * @param buffer File buffer to process
+ * @returns Extracted text or throws an error
+ */
+async function performOCR(buffer: Buffer): Promise<string> {
+  // Create a timeout promise
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('OCR processing timed out')), OCR_TIMEOUT);
+  });
+  
+  // Create the OCR promise
+  const ocrPromise = async () => {
+    try {
+      const worker = await initTesseract();
+      
+      // Configure worker with optimized settings
+      await worker.setParameters(TESSERACT_JOB_OPTIONS);
+      
+      // Recognize text
+      const result = await worker.recognize(buffer);
+      await worker.terminate();
+      return result.data.text;
+    } catch (err) {
+      console.error('Error in OCR processing:', err);
+      throw new Error('OCR processing failed: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+  
+  // Race the promises
+  return await Promise.race([ocrPromise(), timeoutPromise]) as string;
 } 

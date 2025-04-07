@@ -11,6 +11,18 @@
 **/*.test.tsx
 **/__tests__/
 **/__mocks__/
+**/*.spec.js
+**/*.spec.jsx
+**/*.spec.ts
+**/*.spec.tsx
+**/test/
+**/tests/
+/test-results/
+/playwright-report/
+/playwright/.cache/
+/jest-coverage/
+/cypress/videos/
+/cypress/screenshots/
 
 # next.js
 /.next/
