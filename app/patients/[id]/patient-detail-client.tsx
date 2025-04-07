@@ -198,14 +198,6 @@ export default function PatientDetailClient({ patientId }: PatientDetailClientPr
                       </div>
                     </div>
                     
-                    <div className="flex items-start gap-2">
-                      <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
-                      <div>
-                        <p className="font-medium">Phone</p>
-                        <p className="text-sm text-muted-foreground">{formatPhone(patient.phone)}</p>
-                      </div>
-                    </div>
-                    
                     {patient.email && (
                       <div className="flex items-start gap-2">
                         <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -245,7 +237,7 @@ export default function PatientDetailClient({ patientId }: PatientDetailClientPr
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {!patient.insurance_provider && !patient.insurance_policy_number && !patient.insurance_group_number ? (
+                        {!patient.insurance_provider && !patient.insurance_group_number ? (
                           <div className="flex items-center gap-2 text-muted-foreground py-2">
                             <AlertCircle className="h-5 w-5" />
                             <p>No insurance information on file</p>
@@ -258,12 +250,6 @@ export default function PatientDetailClient({ patientId }: PatientDetailClientPr
                                   <p className="text-sm font-medium">Provider</p>
                                   <p className="text-muted-foreground">{patient.insurance_provider}</p>
                                 </div>
-                                {patient.insurance_policy_number && (
-                                  <div>
-                                    <p className="text-sm font-medium">Policy Number</p>
-                                    <p className="text-muted-foreground">{patient.insurance_policy_number}</p>
-                                  </div>
-                                )}
                                 {patient.insurance_group_number && (
                                   <div>
                                     <p className="text-sm font-medium">Group Number</p>

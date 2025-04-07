@@ -49,7 +49,7 @@ export default function AddPatientPage() {
     phone: '',
     email: '',
     insurance_provider: '',
-    insurance_policy_number: '',
+    insurance_member_id: '',
     insurance_group_number: '',
     allergies: [],
     medical_conditions: []
@@ -141,7 +141,7 @@ export default function AddPatientPage() {
         phone: prev.phone || data.phone || '',
         email: prev.email || data.email || '',
         insurance_provider: prev.insurance_provider || data.insuranceProvider || '',
-        insurance_policy_number: prev.insurance_policy_number || data.insurancePolicyNumber || '',
+        insurance_member_id: prev.insurance_member_id || data.insuranceMemberId || '',
         insurance_group_number: prev.insurance_group_number || data.insuranceGroupNumber || '',
       }));
       
@@ -539,7 +539,7 @@ export default function AddPatientPage() {
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="phone">Phone Number <span className="text-red-500">*</span></Label>
-                    <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} required placeholder="e.g., 555-123-4567" />
+                    <Input id="phone" name="phone" type="tel" value={formData.phone || ''} onChange={handleInputChange} required placeholder="e.g., 555-123-4567" />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="email">Email Address</Label>
@@ -547,7 +547,7 @@ export default function AddPatientPage() {
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
-                    <Textarea id="address" name="address" value={formData.address} onChange={handleInputChange} required placeholder="e.g., 123 Main St, Anytown, USA 12345" />
+                    <Textarea id="address" name="address" value={formData.address || ''} onChange={handleInputChange} required placeholder="e.g., 123 Main St, Anytown, USA 12345" />
                   </div>
                 </div>
                 
@@ -559,10 +559,6 @@ export default function AddPatientPage() {
                     <Input id="insurance_provider" name="insurance_provider" value={formData.insurance_provider || ''} onChange={handleInputChange} />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <Label htmlFor="insurance_policy_number">Policy Number</Label>
-                      <Input id="insurance_policy_number" name="insurance_policy_number" value={formData.insurance_policy_number || ''} onChange={handleInputChange} />
-                    </div>
                     <div className="space-y-1">
                       <Label htmlFor="insurance_group_number">Group Number</Label>
                       <Input id="insurance_group_number" name="insurance_group_number" value={formData.insurance_group_number || ''} onChange={handleInputChange} />

@@ -65,7 +65,7 @@ export default function PatientsPage() {
   const filteredPatients = patients.filter(patient => {
     const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
     return fullName.includes(searchQuery.toLowerCase()) || 
-           patient.phone.includes(searchQuery) || 
+           (patient.phone && patient.phone.includes(searchQuery)) || 
            (patient.email && patient.email.toLowerCase().includes(searchQuery.toLowerCase()));
   });
 
@@ -174,7 +174,7 @@ export default function PatientsPage() {
                                 <TableCell className="hidden lg:table-cell">
                                   <div className="flex items-center gap-1 text-muted-foreground">
                                     <Phone className="h-3.5 w-3.5" />
-                                    <span>{formatPhone(patient.phone)}</span>
+                                    <span>{formatPhone(patient.phone || '')}</span>
                                   </div>
                                 </TableCell>
                                 <TableCell className="hidden xl:table-cell">
@@ -240,7 +240,7 @@ export default function PatientsPage() {
                           </TableHeader>
                           <TableBody>
                             {patients
-                              .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+                              .sort((a, b) => new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime())
                               .slice(0, 5)
                               .map((patient) => (
                                 <TableRow 
@@ -261,11 +261,11 @@ export default function PatientsPage() {
                                   <TableCell className="hidden lg:table-cell">
                                     <div className="flex items-center gap-1 text-muted-foreground">
                                       <Phone className="h-3.5 w-3.5" />
-                                      <span>{formatPhone(patient.phone)}</span>
+                                      <span>{formatPhone(patient.phone || '')}</span>
                                     </div>
                                   </TableCell>
                                   <TableCell>
-                                    {new Date(patient.updated_at).toLocaleDateString()}
+                                    {new Date(patient.updated_at || '').toLocaleDateString()}
                                   </TableCell>
                                   <TableCell className="text-right">
                                     <Button
